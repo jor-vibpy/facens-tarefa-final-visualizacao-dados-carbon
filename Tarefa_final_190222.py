@@ -1851,5 +1851,9 @@ def update_heatmap_emissions(selected_column, selected_year):
 
   return fig, title, text
 
+#---------------------------------
+#Run Dash App
+#---------------------------------
+
 if __name__ == "__main__":
   app.run_server(debug=False)

@@ -1050,6 +1050,8 @@ app = dash.Dash(__name__)
 app.layout = html.Div([
     html.H1('Distribution of Global Emissions and Warming Impact'),
 
+    html.P('Select font of warming impact:'),
+
     dcc.Dropdown(
         id='source-dropdown',
         options=[
@@ -1061,6 +1063,7 @@ app.layout = html.Div([
         style={'width': '50%'},
     ),
 
+    html.P('Select polluent gas:'),
     dcc.Dropdown(
         id='gas-dropdown',
         options=[
@@ -1078,6 +1081,8 @@ app.layout = html.Div([
 
 
     html.H2('1. Global Evolution of emissions and surface temperature rise'),
+
+    html.P('Select a country or region:'),
     dcc.Dropdown(
             id='country-dropdown',
             options=[
@@ -1121,9 +1126,16 @@ app.layout = html.Div([
                      'fontweight': 'bold',
                  }),
 
+    dcc.Markdown(id = 'line-temp-text', mathjax=True,
+                 style={
+                     'fontSize': '20px',
+                     'fontFamily': 'Open Sans',
+                 }),
+
     dcc.Graph(id = 'line-temp'),
 
     html.H2('2. Historical Evolution of Largest Emitters'),
+    html.P('Select a country or region:'),
     dcc.Dropdown(
             id='country-bar-dropdown',
             options=[
@@ -1141,6 +1153,12 @@ app.layout = html.Div([
                      'fontweight': 'bold',
                  }),
 
+    dcc.Markdown(id = 'bar-text', mathjax=True,
+                 style={
+                     'fontSize': '20px',
+                     'fontFamily': 'Open Sans',
+                 }),
+
     dcc.Graph(id = 'bar-emissions'),
 
     html.H2('3. Global surface temperature rise'),
@@ -1150,6 +1168,12 @@ app.layout = html.Div([
                      'fontFamily': 'Open Sans',
                      'fontweight': 'bold',
                  }),
+    dcc.Markdown(id = 'map-text', mathjax=True,
+                 style={
+                     'fontSize': '20px',
+                     'fontFamily': 'Open Sans',
+                 }),
+
     dcc.Graph(id = 'map-warming'),
     dcc.Slider(
             id='year-map-slider',
@@ -1169,14 +1193,21 @@ app.layout = html.Div([
                      'fontFamily': 'Open Sans',
                      'fontweight': 'bold',
                  }),
+
+    dcc.Markdown(id = 'box-text', mathjax=True,
+                 style={
+                     'fontSize': '20px',
+                     'fontFamily': 'Open Sans',
+                 }),
+
     dcc.Graph(id = 'box-warming'),
 
     html.H2('5. Relationship between Emissions and GDP'),
     dcc.RadioItems(
         id='scatter-mode',
         options=[
-            {'label':'Último ano disponível (estático)', 'value': 'static'},
-            {'label': 'Com slider (animação)', 'value':'animated'},
+            {'label':'Last year available (static)', 'value': 'static'},
+            {'label': 'All years (slider)', 'value':'animated'},
 
         ],
         value='static',
@@ -1188,14 +1219,15 @@ app.layout = html.Div([
                      'fontFamily': 'Open Sans',
                      'fontweight': 'bold',
                  }),
+
+    dcc.Markdown(id = 'scatter-text', mathjax=True,
+                 style={
+                     'fontSize': '20px',
+                     'fontFamily': 'Open Sans',
+                 }),
+
     dcc.Slider(
             id='year-scatter-slider',
-            min = 1820,
-            max = 2022,
-            value = 1820,
-            marks={int(y): str(y) for y in range(1820,
-                                                2023+1,
-                                                10)},
             step=1,
             updatemode='drag'
         ),
@@ -1208,16 +1240,33 @@ app.layout = html.Div([
                      'fontFamily': 'Open Sans',
                      'fontweight': 'bold',
                  }),
+    dcc.Markdown(id = 'corr-text', mathjax=True,
+                 style={
+                     'fontSize': '20px',
+                     'fontFamily': 'Open Sans',
+                 }),
+    dcc.Slider(
+            id='year-corr-slider',
+            min = 1851,
+            max = 2022,
+            value = 1851,
+            marks={int(y): str(y) for y in range(1851,
+                                                2022+1,
+                                                10)},
+            step=1,
+            updatemode='drag'
+        ),
     dcc.Graph(id = 'heatmap-warming'),
+    html.P('Select columns for correlation:'),
     dcc.Dropdown(
         id='column-dropdown',
         options=[
-            {'label': c, 'value':c} for c in df_merge_co2_inc_reg_new[['co2_including_luc', 'oil_co2', 'cement_co2', 'population', 'gdp',
-                   'methane', 'warming_impact_total_Jones', 'nitrous_oxide',
+            {'label': c, 'value':c} for c in df_merge_co2_inc_reg_new[['co2_total_gb', 'oil_co2', 'cement_co2', 'population', 'gdp',
+                   'ch4_total_jones', 'warming_impact_total_Jones', 'n2o_total_jones',
                    'coal_co2', 'gas_co2', 'flaring_co2']].columns
         ],
-        value=['co2_including_luc', 'population', 'gdp',
-                'methane', 'warming_impact_total_Jones', 'nitrous_oxide',
+        value=['co2_total_gb', 'gdp',
+                'ch4_total_jones', 'warming_impact_total_Jones', 'n2o_total_jones',
                   ],
         style={'width': '70%'},
         multi=True
@@ -1242,10 +1291,36 @@ def update_bar_dropdown(selected_gas):
   top_countries = dff.sort_values(by=selected_gas, ascending=False).head(5)['country'].tolist()
   return top_countries
 
+#Scatter - slider ano
+@app.callback(
+    [dash.Output('year-scatter-slider', 'min'),
+     dash.Output('year-scatter-slider', 'max'),
+     dash.Output('year-scatter-slider', 'value'),
+     dash.Output('year-scatter-slider', 'marks')],
+    [dash.Input('gas-dropdown', 'value'),]
+)
+
+def update_scatter_slider(selected_gas):
+
+  dff = df_merge_co2_inc_reg_new[['year', 'country', 'gdp', selected_gas]][df_merge_co2_inc_reg_new[selected_gas]!=0]
+  dff_min = dff.dropna()
+
+  minimal_year = dff_min['year'].min()
+
+  min_year = minimal_year
+  max_year = 2022
+  value = minimal_year
+  marks={int(y): str(y) for y in range(minimal_year,
+                                      2022+1,
+                                      10)}
+
+  return min_year, max_year, value, marks
+
 #Linha - Temperatura
 @app.callback(
     [dash.Output('line-temp', 'figure'),
-     dash.Output('line-temp-title', 'children')],
+     dash.Output('line-temp-title', 'children'),
+     dash.Output('line-temp-text', 'children')],
     [dash.Input('source-dropdown', 'value'),
      dash.Input('gas-dropdown', 'value'),
      dash.Input('country-dropdown', 'value'),
@@ -1280,9 +1355,11 @@ def update_line_temp(selected_source, selected_gas, selected_country, selected_v
   if selected_filter == 'source-dropdown':
     column = selected_source+selected_value_mode
     title = value_display+ ' ' + dict_title_source[selected_source]
+    text = 'The cumulative effect shows that the richest countries are still the most responsible for global warming.'
   else:
     column = selected_gas+selected_value_mode
     title = value_display+ ' ' + dict_title_gas[selected_gas]
+    text = 'Although richer countries have higher absolute emissions, the speed of relative change is more intense in lower-income countries.'
 
   minimal_year = []
   for i in selected_country:
@@ -1327,12 +1404,13 @@ def update_line_temp(selected_source, selected_gas, selected_country, selected_v
   fig.update_xaxes(title_text='')
   fig.update_yaxes(title_text='')
 
-  return fig, title
+  return fig, title, text
 
 #Barra - Emissões
 @app.callback(
   [dash.Output('bar-emissions', 'figure'),
-   dash.Output('bar-title', 'children')],
+   dash.Output('bar-title', 'children'),
+   dash.Output('bar-text', 'children')],
   [dash.Input('gas-dropdown', 'value'),
     dash.Input('country-bar-dropdown', 'value')]
 )
@@ -1361,6 +1439,8 @@ def update_bar_emissions(selected_gas, selected_country):
 
   title = value_display+ ' ' + dict_title_gas[selected_gas] +' ' + title_place + ' ' + title_year + '' + title_place_2
 
+  text = 'The largest emitters have changed over time, but most industrialized economies remain among the biggest contributors.'
+
   years = df_merge_co2_inc_reg_new['year'][df_merge_co2_inc_reg_new['year']>=np.min(minimal_year)].unique()
 
   df_full = pd.MultiIndex.from_product([selected_country, years], names = ['country', 'year']).to_frame(index=False)
@@ -1381,12 +1461,13 @@ def update_bar_emissions(selected_gas, selected_country):
   fig.update_xaxes(title_text='')
   fig.update_yaxes(title_text='')
 
-  return fig, title
+  return fig, title, text
 
 #Mapa - warming
 @app.callback(
   [dash.Output('map-warming', 'figure'),
-   dash.Output('map-title', 'children')],
+   dash.Output('map-title', 'children'),
+   dash.Output('map-text', 'children')],
   [dash.Input('source-dropdown', 'value'),
     dash.Input('country-dropdown', 'value'),
     dash.Input('year-map-slider', 'value')]
@@ -1404,6 +1485,8 @@ def update_map_warming(selected_source, selected_country, selected_year):
 
   title = value_display+ ' ' + dict_title_source[selected_source]
 
+  text = "The warming tendecy isn't just a global average - it is widespread, but with varying intensities."
+
   dff = df_merge_co2_inc_reg_new[['country', 'year', selected_source, 'region']][df_merge_co2_inc_reg_new['year']==selected_year]
   dff = dff.dropna()
   fig = px.choropleth(
@@ -1413,12 +1496,13 @@ def update_map_warming(selected_source, selected_country, selected_year):
       color_continuous_scale='reds',
       range_color=[0,0.1]
   )
-  return fig, title
+  return fig, title, text
 
 #Boxplot - warming-income
 @app.callback(
   [dash.Output('box-warming', 'figure'),
-   dash.Output('box-title', 'children')],
+   dash.Output('box-title', 'children'),
+   dash.Output('box-text', 'children')],
   [dash.Input('source-dropdown', 'value'),
     ]
 )
@@ -1434,6 +1518,7 @@ def update_box_warming(selected_source):
   }
 
   title = value_display+ ' ' + dict_title_source[selected_source]
+  text = "Low-income countries aren't always more polluting. Income levels help understand patterns, but they don't explain everything."
 
   dff = df_merge_co2_inc_reg_new[['country', 'year', selected_source, 'income_group']]
   mask = dff.groupby('country')[selected_source].transform(lambda x: (x!=0).any())
@@ -1449,12 +1534,13 @@ def update_box_warming(selected_source):
   fig.update_xaxes(title_text='')
   fig.update_yaxes(title_text='')
 
-  return fig, title
+  return fig, title, text
 
 #Disperção - Emissões - GDP
 @app.callback(
   [dash.Output('scatter-gdp-emissions', 'figure'),
-   dash.Output('scatter-title', 'children')],
+   dash.Output('scatter-title', 'children'),
+   dash.Output('scatter-text', 'children')],
   [dash.Input('gas-dropdown', 'value'),
    dash.Input('scatter-mode', 'value'),
    dash.Input('year-scatter-slider', 'value'),
@@ -1472,6 +1558,8 @@ def update_scatter_emissions(selected_gas, mode, selected_year):
       'co2_land_use_gb': r'\text{Land Use Change Carbon Dioxide } (CO_2) ',
       'co2_total_gb': r'\text{Total Carbon Dioxide } (CO_2) ',
   }
+
+  text = 'Economic growth has historically been tied to rising polluents emissions. Higher-income countries have continuously emitted more polluents historically.'
 
   if mode=='static':
 
@@ -1505,40 +1593,43 @@ def update_scatter_emissions(selected_gas, mode, selected_year):
         dff, x='gdp', y = selected_gas, color = 'income_group',
         title='',
         log_x = True, log_y = True,
-        animation_frame='year', hover_name='country'
+        hover_name='country'
     )
 
   fig.update_xaxes(title_text='')
   fig.update_yaxes(title_text='')
 
-  return fig, title
+  return fig, title, text
 
 #Heatmap - warming
 @app.callback(
   [dash.Output('heatmap-warming', 'figure'),
-   dash.Output('corr-title', 'children')],
+   dash.Output('corr-title', 'children'),
+   dash.Output('corr-text', 'children')],
   [dash.Input('column-dropdown', 'value'),
+   dash.Input('year-corr-slider', 'value'),
        ]
 )
 
-def update_heatmap_emissions(selected_column):
+def update_heatmap_emissions(selected_column, selected_year):
 
   cols = ', '.join(selected_column)
 
-  title = r'$\text{' + ' ' + r'Correlation Matrix of ' + ' ' + rf'{cols}' + ' '+ r'by year}$'
+  title = r'$\text{' + ' ' + r'Correlation Matrix of ' + ' ' + rf'{cols}' + ' '+ r'by year ' + ' ' + rf'({selected_year})' +r'}$'
 
-  dff = df_merge_co2_inc_reg_new[(df_merge_co2_inc_reg_new['year']>=1851)&
-                             (df_merge_co2_inc_reg_new['year']<=2022)]
+  text_1 = 'Emissions, warmig impact and GDP are interconnected, reinforcing that development, demographics and climate cannot be discussed in isolation.'
+
+  text_2='Higher-income countries have historically polluted more and are responsible for much of the global warming. Lower-income countries have seen faster emissions growth, but still have a lesser impact.'
+
+  text_3 = 'Higher-income countries have an historical obligation and economic capacity to fund the energy transition.'
+
+  text = f'''{text_1 } {text_2}
+
+   **{text_3}**'''
+
+  dff = df_merge_co2_inc_reg_new[df_merge_co2_inc_reg_new['year']==selected_year]
 
   corrs=[]
-
-  for ano, dados in dff.groupby('year'):
-    corr=dados[selected_column].corr()
-    corr = corr.reset_index().melt(id_vars='index')
-    corr['year']=ano
-    corrs.append(corr)
-
-  df_corr = pd.concat(corrs)
 
   fig = px.imshow(
       dff[selected_column].corr(),
@@ -1550,26 +1641,7 @@ def update_heatmap_emissions(selected_column):
       text_auto=True
   )
 
-  frames = []
-  for ano, dados in dff.groupby('year'):
-    corr=dados[selected_column].corr()
-    frames.append(dict(
-        name=str(ano),
-        data=[dict(z=corr.values, type='heatmap')]
-    ))
-
-  fig.frames=frames
-
-  sliders= [dict(
-      steps=[dict(method='animate', args=[[str(ano)], dict(mode='immediate')], label=str(ano))
-                  for ano in sorted(dff['year'].unique())],
-      transition=dict(duration=300),
-      x=0,y=-0.1,
-      currentvalue=dict(prefix='Ano: ', font=dict(size=14))
-  )]
-
-  fig.update_layout(sliders=sliders)
-  return fig, title
+  return fig, title, text
 
 if __name__ == '__main__':
   app.run()

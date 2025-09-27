@@ -7,13 +7,18 @@ from dash import dcc, html
 import plotly.express as px
 import plotly.graph_objects as go
 
+#Function to download and save data from a given URL
 def get_data_web(repo_file, file_name):
 
   url = repo_file
   response = requests.get(url)
-
+  #Save response content to a local file
   with open(file_name, 'w', encoding='utf-8') as f:
     f.write(response.text)
+
+#-----------------------------
+#Download raw datasets
+#-----------------------------
 
 url_1 = 'https://raw.githubusercontent.com/owid/co2-data/refs/heads/master/owid-co2-codebook.csv'
 url_2 = 'https://raw.githubusercontent.com/owid/co2-data/refs/heads/master/owid-co2-data.csv'
@@ -22,27 +27,36 @@ file_name_2 = 'owid-co2-data.csv'
 url_download = 'https://zenodo.org/records/14054503/files/GMST_response_1851-2023.csv'
 file_name_3 = 'GMST_response_1851-2023.csv'
 
+#Download files locally
 get_data_web(url_1, file_name_1)
 get_data_web(url_2, file_name_2)
 get_data_web(url_download, file_name_3)
 
+#-----------------------------
+#Load OWID datasets
+#-----------------------------
+
 df_codebook = pd.read_csv('owid-co2-codebook.csv')
 df_co2 = pd.read_csv('owid-co2-data.csv')
 
-# Verificando dados
+# Data inspection
 print ("Tabela 1 - Verificação de dados")
 print(df_co2.info())
 print("\n")
 
-# Verificando se há algum valor vazio
+# Checking for missing values
 print ("Tabela 2 - Verificação de dados vazios")
 print(df_co2.isna().any())
 print("\n")
 
-# Verificando quantidade de dados vazios
+# Cheking missing values count
 print ("Tabela 3 - Verificação de quantidade de dados vazios")
 print(df_co2.isna().sum())
 print("\n")
+
+#-----------------------------
+#Create per capita indicators
+#-----------------------------
 
 df_co2['ghg_person'] = (df_co2['total_ghg']*(10**6))/df_co2['population']
 
@@ -60,31 +74,42 @@ df_co2['nitrous_oxide_person'] = (df_co2['nitrous_oxide']*(10**6))/df_co2['popul
 
 df_co2['nitrous_oxide_person'][(df_co2['country'] == 'Afghanistan') & (df_co2['year'] == 2011)]
 
+#Warming impact = CO2 + CH4 + N2O temperature contribution
+
 df_co2['warming_impact'] = (df_co2['temperature_change_from_co2'] +
                             (df_co2['temperature_change_from_ch4'] +
                             df_co2['temperature_change_from_n2o']))
 
-df_co2['warming_impact'][(df_co2['country'] == 'Afghanistan') & (df_co2['year'] == 2023)]
+#-----------------------------
+#Load GMST response Dataset
+#containig temperature data
+#From Jones et. al
+#-----------------------------
 
 df_temp_data = pd.read_csv('GMST_response_1851-2023.csv')
 
-# Verificando dados
+# Data inspection
 print ("Tabela 1 - Verificação de dados")
 print(df_temp_data.info())
 print("\n")
 
-# Verificando se há algum valor vazio
+# Checking for missing values
 print ("Tabela 2 - Verificação de dados vazios")
 print(df_temp_data.isna().any())
 print("\n")
 
-# Verificando quantidade de dados vazios
+# Cheking missing values count
 print ("Tabela 3 - Verificação de quantidade de dados vazios")
 print(df_temp_data.isna().sum())
 print("\n")
 
+#Standardize country column name
 df_temp_data = df_temp_data.rename(columns={'CNTR_NAME': 'country'})
 
+
+#-----------------------------------
+#Align country names across datasets
+#-----------------------------------
 paises_1 = set(df_co2['country'].unique())
 paises_2 = set(df_temp_data['country'].unique())
 
@@ -94,6 +119,8 @@ so_no_dftemp = paises_2-paises_1
 print(so_no_dfco2)
 print(so_no_dftemp)
 
+#Dictionary to harmonize country names between datasets
+#From owid co2 repository
 new_countries_name_temperature = {
   "Afghanistan": "Afghanistan",
   "Albania": "Albania",
@@ -319,6 +346,8 @@ new_countries_name_temperature = {
   "OECD": "OECD (Jones et al.)"
 }
 
+#Excluded aggregated regions or groups that are not needed
+#From owid co2 repository
 excluded_countries_name_temperature = [
     "ANNEXI",
     "ANNEXII",
@@ -329,19 +358,25 @@ excluded_countries_name_temperature = [
     "Pacific Islands (Palau)"
 ]
 
+#Filter and harmonize names
 df_temp_data = df_temp_data[~df_temp_data['country'].isin(excluded_countries_name_temperature)]
 
 df_temp_data['country'] = df_temp_data['country'].replace(new_countries_name_temperature)
+
+#----------------------------------
+#Load income groups classifications
+#----------------------------------
 
 url_income_groups = 'https://ourworldindata.org/grapher/world-bank-income-groups.csv?v=1&csvType=full&useColumnShortNames=true'
 get_data_web(url_income_groups, 'world-bank-income-groups.csv')
 
 df_income_groups = pd.read_csv('world-bank-income-groups.csv')
 
-df_income_groups = df_income_groups[df_income_groups['Year'] == 2024]
+df_income_groups = df_income_groups[df_income_groups['Year'] == 2024] #Use most recent classification
 
 df_income_groups = df_income_groups.rename(columns={'Entity': 'country'})
 
+#Add countries without classification by World Bank, for calcularions (manual fix)
 df_income_groups_ven_eth = pd.concat([
     df_income_groups,
     pd.DataFrame({'country': ['Venezuela', 'Ethiopia'],
@@ -350,17 +385,25 @@ df_income_groups_ven_eth = pd.concat([
                  'classification': ['Upper-middle-income countries', 'Low-income countries']})
     ])
 
+#Merge temperature data with income groups
 df_merge_inc = df_temp_data.merge(
     df_income_groups_ven_eth[['country', 'classification']],
     on='country',
     how='left'
 )
 
+#Agreggate by classsification (income group), gas type, component of gas, year and unit (just to mantain)
 df_group = df_merge_inc.groupby(['classification', 'Gas', 'Component','Year', 'Unit'])['Data'].sum().reset_index()
 
+#Rename classification to country (so they can be treated as countries)
 df_group = df_group.rename(columns={'classification': 'country'})
 
+#Combine individual countries and aggregated groups
 df_comb_temp = pd.concat([df_temp_data, df_group], axis=0, ignore_index=True)
+
+#------------------------------
+#Load OWID regional definitions
+#------------------------------
 
 import yaml
 
@@ -376,6 +419,7 @@ get_data_web(url_regions_code, 'regions_code.csv')
 
 df_codes = pd.read_csv('regions_code.csv', keep_default_na=False, na_values=[''])
 
+#Clean missing metadata
 df_regions['short_name'] = df_regions['short_name'].fillna(df_regions['name'])
 df_regions['region_type'] = df_regions['region_type'].fillna('country')
 
@@ -384,12 +428,12 @@ if 'defined_by' not in df_regions.columns:
 df_regions['defined_by'] = df_regions['defined_by'].fillna('owid')
 df_regions['is_historical'] = df_regions['is_historical'].fillna(False)
 
+#Regions to be included
 regions_filter = ['Africa', 'Asia', 'Europe', 'North America', 'Oceania', 'South America',
                   'Asia (excl. China and India)', 'Europe (excl. EU-27)', 'Europe (excl. EU-28)',
                   'North America (excl. USA)', 'European Union (28)']
 
-df_regions[['code','members']][df_regions['short_name'] =='United Kingdom']
-
+#Build additional region UE-28
 european_union_27 = df_regions.loc[df_regions['short_name'] == 'European Union (27)', 'members'].values[0]
 european_union_28 = european_union_27 + ['GBR']
 df_regions = pd.concat([
@@ -397,6 +441,7 @@ df_regions = pd.concat([
     pd.DataFrame([{'short_name': 'European Union (28)', 'members': european_union_28}])
 ], ignore_index=True)
 
+#Build special agreggate reions (excl. China, excl. USA, etc.)
 regions_add_dict = {}
 
 regras = [
@@ -416,29 +461,37 @@ df_new_regions = pd.DataFrame(
     [{'short_name': k, 'members': v} for k, v in regions_add_dict.items()]
 )
 
+#Combine original regions dataset with new regions dataset
 df_region_final = pd.concat([df_regions, df_new_regions], ignore_index=True)
 
 df_regions_short = df_region_final[['short_name','members']][df_region_final['short_name'].isin(regions_filter)]
 
+#Explode member codes and merge with temperature dataset
 df_regions_exploded = df_regions_short.explode('members')
 df_merge_regions = df_regions_exploded.merge(df_temp_data, left_on='members',
                                              right_on='ISO3', how='left')
+
+#Aggreagate by region
 df_region_temp = (
     df_merge_regions.groupby(['short_name', 'Year', 'Gas','Component', 'Unit'], as_index=False)['Data'].sum()
 )
 
 df_region_temp = df_region_temp.rename(columns={'short_name': 'country'})
 
+#Combine regions with country and income groups
 df_comb_reg_inc = pd.concat([df_comb_temp, df_region_temp], axis=0, ignore_index=True)
 
+#Create composite column (component + gas)
 df_comb_reg_inc['category'] = df_comb_reg_inc['Component'] + '_' + df_comb_reg_inc['Gas']
 
+#Pivot to wide format (columns = categories, rows = country/year)
 df_comb_reg_inc_pivot = df_comb_reg_inc.pivot_table(
     index=['country', 'Year', 'Unit'],
     columns='category',
     values='Data'
 ).reset_index()
 
+#Rename columns for easier access
 df_comb_reg_inc_pivot_rename = df_comb_reg_inc_pivot.rename(
     columns={'Year': 'year',
              'Fossil_CH[4]': 'temperature_change_from_ch4_fossil',
@@ -451,6 +504,7 @@ df_comb_reg_inc_pivot_rename = df_comb_reg_inc_pivot.rename(
              'LULUCF_3-GHG': 'temperature_change_from_ghg_lucf'}
 )
 
+#Merge CO2 dataset with temperature impacts
 df_merge_co2 = df_co2.merge(
     df_comb_reg_inc_pivot_rename[['country', 'year', 'temperature_change_from_ch4_fossil',
                            'temperature_change_from_co2_fossil', 'temperature_change_from_n2o_fossil',
@@ -461,23 +515,31 @@ df_merge_co2 = df_co2.merge(
     how='left'
 )
 
+#-------------------------------------
+#Add derived warming impact indicators
+#-------------------------------------
+
 income_groups = ['High-income countries', 'Low-income countries', 
                 'Lower-middle-income countries', 'Upper-middle-income countries']
 
+#Add warming impact from fossil fuels and industry
 df_merge_co2['warming_impact_fossil'] = ((df_merge_co2['temperature_change_from_co2_fossil']) +
                             (df_merge_co2['temperature_change_from_ch4_fossil'] +
                             df_merge_co2['temperature_change_from_n2o_fossil']))
 
+#Add warming impact from land use change
 df_merge_co2['warming_impact_land'] = (df_merge_co2['temperature_change_from_co2_lucf'] +
                             (df_merge_co2['temperature_change_from_ch4_lucf'] +
                             df_merge_co2['temperature_change_from_n2o_lucf']))
 
+#Merge with income groups
 df_merge_co2_inc = df_merge_co2.merge(
     df_income_groups[['country', 'classification']],
     on='country',
     how='left'
 )
 
+#Merge with continent/region info
 df_regions_exploded_2 = df_regions[df_regions['short_name'].isin(['Asia', 'Africa', 'Europe', 'Oceania', 'North America', 'South America'])].explode('members')
 df_merge_co2_inc_reg = df_merge_co2_inc.merge(df_regions_exploded_2[['members', 'short_name']], right_on='members',
                                              left_on='iso_code', how='left')
@@ -486,9 +548,18 @@ df_merge_co2_inc_reg = df_merge_co2_inc_reg.drop(columns=['members'])
 
 df_merge_co2_inc_reg = df_merge_co2_inc_reg.rename(columns={'classification': 'income_group', 'short_name':'region'})
 
+#Total warming impact (from Jones et. al)
 df_merge_co2_inc_reg['warming_impact_total_Jones'] = df_merge_co2_inc_reg['warming_impact_land'] + df_merge_co2_inc_reg['warming_impact_fossil']
 
+#-----------------------------
+#Helper functions
+#-----------------------------
+
 def min_year(df, col_year, col_country, col_ind, country):
+  '''
+  Return the first year with nonzero and non-NaN values
+  for a given indicator and country.
+  '''
   df = df[[col_ind, col_year, col_country]].copy()
 
   df = df[(df[col_ind] != 0)&(~df[col_ind].isna())]
@@ -498,7 +569,10 @@ def min_year(df, col_year, col_country, col_ind, country):
   return min_year
 
 def relative_change(df, g, col, col_year='year'):
-
+  '''
+  Compute relative change (%) for a given column starting
+  from the first nonzero valid year.
+  '''
   start_year = min_year(df, 'year', 'country', col, g.name)
   g = g[g[col_year] >= start_year]
   if g.empty:
@@ -507,6 +581,10 @@ def relative_change(df, g, col, col_year='year'):
   rel = ((g[col]) - (base_value)) / abs((base_value))*100
   rel.iloc[0] = 0
   return rel
+
+#---------------------------------
+#Apply relative change computation
+#---------------------------------
 
 df_merge_co2_inc_reg['co2_including_luc_relative_change'] = (
     df_merge_co2_inc_reg.groupby('country', group_keys=False)
@@ -553,53 +631,82 @@ df_merge_co2_inc_reg['total_ghg_relative_change'] = (
     .apply(lambda g: relative_change(df_merge_co2_inc_reg,g, 'total_ghg'))
 )
 
+#------------------------------------------------------------
+#Download and preprocess emissions data (Jones dataset + GCB)
+#------------------------------------------------------------
+
+#URL for annual emissions dataset Jones et. al (1830-2023)
 url_all_emissions = 'https://zenodo.org/records/14054503/files/EMISSIONS_ANNUAL_1830-2023.csv'
 get_data_web(url_all_emissions, 'all_emissions.csv')
 
+#Load emissions dataset
 df_all_emissions = pd.read_csv('all_emissions.csv')
 
+# Standardize column name
 df_all_emissions = df_all_emissions.rename(columns={'CNTR_NAME': 'country'})
 
+#Conver units:
+#Tg = teragrams = 1e6 tonnes
+#Pg = petagrams = 1e9 tonnes
 df_all_emissions.loc[df_all_emissions['Unit'].str.startswith('Tg'), 'Data'] *= 1e6
 df_all_emissions.loc[df_all_emissions['Unit'].str.startswith('Pg'), 'Data'] *= 1e9
 
+#Drop the unit column (no longer needed)
 df_all_emissions = df_all_emissions.drop(columns='Unit')
 
+#Remove agreggate/non-country entries
 df_all_emissions = df_all_emissions[~df_all_emissions['country'].isin(excluded_countries_name_temperature)]
 
+#Standardize country names
 df_all_emissions['country'] = df_all_emissions['country'].replace(new_countries_name_temperature)
 
+#Merge with income group classification
 df_merge_inc_all_emissions = df_all_emissions.merge(
     df_income_groups_ven_eth[['country', 'classification']],
     on='country',
     how='left'
 )
 
+#Aggregate emissions by income group, gas, component and year
 df_group_all_emissions = df_merge_inc_all_emissions.groupby(['classification', 'Gas', 'Component','Year'])['Data'].sum().reset_index()
+
+#Rename classification to country for consistency
 df_group_all_emissions = df_group_all_emissions.rename(columns={'classification': 'country'})
 
+#Combine country-level and income-group-level datasets
 df_comb_all_emissions = pd.concat([df_all_emissions, df_group_all_emissions], axis=0, ignore_index=True)
 
+#Merge to add regional aggregations
 df_merge_regions_all_emissions= df_regions_exploded.merge(df_all_emissions, left_on='members',
                                              right_on='ISO3', how='left')
+
+#Aggregate emissions by region, year, gas and component
 df_region_all_emissions = (
     df_merge_regions_all_emissions.groupby(['short_name', 'Year', 'Gas','Component'], as_index=False)['Data'].sum()
 )
 
+#Rename short name to country
 df_region_all_emissions = df_region_all_emissions.rename(columns={'short_name': 'country'})
 
+#Combine countries, income groups and regions
 df_comb_reg_inc_all_emissions= pd.concat([df_comb_all_emissions, df_region_all_emissions], axis=0, ignore_index=True)
 
+#Create a category column combining component and gas (e.g. "Fossil CO2")
 df_comb_reg_inc_all_emissions['category'] = df_comb_reg_inc_all_emissions['Component'] + '_' + df_comb_reg_inc_all_emissions['Gas']
 
+#Pivot to wide format:
+#Rows = (country, year)
+#Columns = emission categories
 df_comb_reg_inc_all_emissions_pivot = df_comb_reg_inc_all_emissions.pivot_table(
     index=['country', 'Year'],
     columns='category',
     values='Data'
 ).reset_index()
 
+#Keep only years >=1850 to avoid data mismatch and emissions jump from prior to 1850
 df_comb_reg_inc_all_emissions_pivot = df_comb_reg_inc_all_emissions_pivot[df_comb_reg_inc_all_emissions_pivot['Year']>=1850].reset_index(drop=True)
 
+#Rename columns for readability
 df_comb_reg_inc_all_emissions_rename = df_comb_reg_inc_all_emissions_pivot.rename(
     columns={'Year': 'year',
              'Fossil_CH[4]': 'ch4_fossil_jones',
@@ -613,42 +720,58 @@ df_comb_reg_inc_all_emissions_rename = df_comb_reg_inc_all_emissions_pivot.renam
              'Total_N[2]*O': 'n2o_total_jones'}
 )
 
+#Recalculate methane total using GWP (different weights for fossil vs LULUCF)
 df_comb_reg_inc_all_emissions_rename['ch4_total_jones'] = (
     df_comb_reg_inc_all_emissions_rename['ch4_fossil_jones']*29.8 +
     df_comb_reg_inc_all_emissions_rename['ch4_lucf_jones']*27.2
 )
 
+# Recalculate N2O total with GWP factor = 273
 df_comb_reg_inc_all_emissions_rename['n2o_total_jones'] = (
     df_comb_reg_inc_all_emissions_rename['n2o_total_jones'] * 273
 )
 
+#Drop intermediate columns
 df_comb_reg_inc_all_emissions_rename = df_comb_reg_inc_all_emissions_rename.drop(columns=[
     'ch4_fossil_jones', 'n2o_fossil_jones', 'ch4_lucf_jones', 'n2o_lucf_jones'
 ])
 
+#------------------------------------------------------------
+#Land-use change CO2 data (BLUE model + Global Carbon Budget)
+#------------------------------------------------------------
+
+#Load national land-use emissions dataset (BLUE model)
 df_co2_land_use_gb = pd.read_excel('National_LandUseChange_Carbon_Emissions_2024v1.0-1.xlsx', sheet_name='BLUE', header=7)
 
+#Load global dataset from GCB
 df_co2_world_land = pd.read_excel('Global_Carbon_Budget_2024_v1.0-1.xlsx', sheet_name='Historical Budget', header=15)
 
+#Keep only year and land-use emissions columns
 df_co2_world_land = df_co2_world_land[['Year', 'land-use change emissions']]
 df_co2_world_land = df_co2_world_land.dropna()
+#Convert from MtC to ktCO2 (factor 1000)
 df_co2_world_land['land-use change emissions'] = df_co2_world_land['land-use change emissions']*1000
 
+#Reshape country-level dataset to long format
 df_co2_land_use_gb = df_co2_land_use_gb.melt(
     id_vars=['unit: Tg C/year'],
     var_name = 'country',
     value_name='value'
 )
 
+#Rename columns for clarity
 df_co2_land_use_gb = df_co2_land_use_gb.rename(columns={'unit: Tg C/year': 'year',
                                                         'value': 'Data'})
 
+#Replace "Global" row with the global dataset from GCB
 df_co2_land_use_gb.loc[df_co2_land_use_gb['country']=='Global', 'Data'] = (
     df_co2_land_use_gb.loc[df_co2_land_use_gb['country']=='Global', 'year']
     .map(df_co2_world_land.set_index('Year')['land-use change emissions']))
 
+#Convert from TgC to tonnes of CO2
 df_co2_land_use_gb['Data'] = df_co2_land_use_gb['Data']*3.664*1e6
 
+#Exclude non-country entities
 excluded_countries_name_temperature_land = [
 	"KP Annex B",
 	"Non KP Annex B",
@@ -656,6 +779,7 @@ excluded_countries_name_temperature_land = [
 	"OTHER",
 ]
 
+#Dictionary to harmonize country names between datasets
 new_countries_name_land = {
     "Afghanistan": "Afghanistan",
     "Africa": "Africa (GCP)",
@@ -940,51 +1064,75 @@ new_countries_name_land = {
     "Zimbabwe": "Zimbabwe",
     "\u00c5land Islands": "Aland Islands"
 }
-
+#Remove excluded countries
 df_co2_land_use_gb = df_co2_land_use_gb[~df_co2_land_use_gb['country'].isin(excluded_countries_name_temperature_land)]
 
+#Standardize country names
 df_co2_land_use_gb['country'] = df_co2_land_use_gb['country'].replace(new_countries_name_land)
 
+#---------------------------------------------------
+#Fossil CO2 emissions (Global Carbon Budget dataset)
+#---------------------------------------------------
+
+#Download fossil CO2 dataset
 url_fossil_gb = 'https://zenodo.org/records/13981696/files/GCB2024v17_MtCO2_flat.csv'
 get_data_web(url_fossil_gb, 'co2_fossil_emissions.csv')
 
+#Load fossil dataset
 df_co2_fossil = pd.read_csv('co2_fossil_emissions.csv')
 
+#Conver from MTCO2 to tonnes
 df_co2_fossil['Total'] = df_co2_fossil['Total']*1e6
 
+#Standardize column names
 df_co2_fossil = df_co2_fossil.rename(columns={'ISO 3166-1 alpha-3': 'ISO3',
                                               'Country': 'country',
                                               'Year': 'year'})
 
+#Replace zeros with NaN when all individual sources are NaN
 no_emission_replace_nan = df_co2_fossil.drop(columns=['country', 'year', 'Total', 'ISO3', 'UN M49']).isnull().all(axis=1)
 df_co2_fossil.loc[no_emission_replace_nan, 'Total'] = np.nan
 
+#Drop unneded columns
 df_co2_fossil = df_co2_fossil.drop(columns=['UN M49', 'Coal', 'Oil', 'Gas', 'Cement', 'Flaring', 'Other', 'Per Capita'])
 
+#Exclude aggregates
 df_co2_fossil = df_co2_fossil[~df_co2_fossil['country'].isin(excluded_countries_name_temperature_land)]
 
+#Standardize country names
 df_co2_fossil['country'] = df_co2_fossil['country'].replace(new_countries_name_land)
 
+#--------------------------------------------------
+#Combine Fossil and Land-use to total CO2 emissions
+#--------------------------------------------------
+
+#Merge fossil and land-use dataframes
 df_co2_total = df_co2_fossil.merge(
     df_co2_land_use_gb[['country', 'year','Data']],
     on=['country', 'year'],
     how='left'
 )
 
+#Rename columns
 df_co2_total = df_co2_total.rename(columns={'Total': 'fossil', 'Data': 'land_use'})
 
+#Compute total CO2
 df_co2_total['Total'] = df_co2_total['fossil'] + df_co2_total['land_use']
 
+#Add income groups
 df_merge_inc_total = df_co2_total.merge(
     df_income_groups_ven_eth[['country', 'classification']],
     on='country',
     how='left'
 )
 
+#Aggregate by income group
 df_group_co2_total = df_merge_inc_total.groupby(['classification', 'year'])[['fossil','land_use', 'Total']].sum().reset_index()
 
+#Rename classification to country to standardize column name
 df_group_co2_total = df_group_co2_total.rename(columns={'classification': 'country'})
 
+#Combine countries and income groups
 df_comb_co2_total = pd.concat([df_merge_inc_total, df_group_co2_total], axis=0, ignore_index=True)
 
 df_merge_regions_co2_total = df_regions_exploded.merge(df_co2_total, left_on='members',
@@ -994,17 +1142,26 @@ df_region_co2_total = (
     df_merge_regions_co2_total.groupby(['short_name', 'year'], as_index=False)[['fossil','land_use', 'Total']].sum()
 )
 
+#Rename shor_name to country to standardize column name
 df_region_co2_total = df_region_co2_total.rename(columns={'short_name': 'country'})
 
+#Combine countries, income groups and regions
 df_comb_reg_inc_total= pd.concat([df_comb_co2_total, df_region_co2_total], axis=0, ignore_index=True)
 
+#-----------------------------------
+#Merge Jones et. al with GCB dataset
+#-----------------------------------
+
+#Drop CO2 columns from Jones et. al dataset (using GCB instead)
 df_comb_reg_inc_all_emissions_rename = df_comb_reg_inc_all_emissions_rename.drop(columns=['co2_fossil_jones', 'co2_lucf_jones',
                                                    'co2_total_jones'])
 
+#Rename CO2 columns from GCB dataset
 df_comb_reg_inc_total_rename = df_comb_reg_inc_total.rename(columns={'Total': 'co2_total_gb',
                                                                      'fossil': 'co2_fossil_gb',
                                                                      'land_use': 'co2_land_use_gb'})
 
+#Merge datasets into master dataframe
 df_merge_co2_all = df_merge_co2_inc_reg.merge(
     df_comb_reg_inc_total_rename[['country', 'year', 'co2_fossil_gb', 'co2_land_use_gb', 'co2_total_gb']],
     on=['country', 'year'],
@@ -1018,7 +1175,13 @@ df_merge_co2_inc_reg_all = df_merge_co2_all.merge(
     how='left'
 )
 
+#Final working dataframe
 df_merge_co2_inc_reg_new = df_merge_co2_inc_reg_all
+
+#---------------------------------
+#Add relative change columns for
+#Jones et. al and GCB columns
+#---------------------------------
 
 df_merge_co2_inc_reg_new['co2_total_gb_relative_change'] = (
     df_merge_co2_inc_reg_new.groupby('country', group_keys=False)
@@ -1045,11 +1208,23 @@ df_merge_co2_inc_reg_new['n2o_total_jones_relative_change'] = (
     .apply(lambda g: relative_change(df_merge_co2_inc_reg_new,g, 'n2o_total_jones'))
 )
 
+#--------------------------------------------------------
+#Dash Application for Global Emissions and Warming Impact
+#--------------------------------------------------------
+
+#Initialize Dash app
 app = dash.Dash(__name__)
+server = app.server
+
+#---------------------------------
+#Layout: Structure of the Web App
+#---------------------------------
 
 app.layout = html.Div([
+	#Title
     html.H1('Distribution of Global Emissions and Warming Impact'),
-
+	
+	#Dropdown: select warming impact source
     html.P('Select font of warming impact:'),
 
     dcc.Dropdown(
@@ -1063,6 +1238,7 @@ app.layout = html.Div([
         style={'width': '50%'},
     ),
 
+	#Dropdown: select polluent gas
     html.P('Select polluent gas:'),
     dcc.Dropdown(
         id='gas-dropdown',
@@ -1078,10 +1254,13 @@ app.layout = html.Div([
         style={'width': '50%'},
     ),
 
-
+	#-----------------------------------------------
+	#Section 1: Line plot (Emissions vs Temperature)
+	#-----------------------------------------------
 
     html.H2('1. Global Evolution of emissions and surface temperature rise'),
 
+	#Dropdown: select country or region
     html.P('Select a country or region:'),
     dcc.Dropdown(
             id='country-dropdown',
@@ -1093,6 +1272,7 @@ app.layout = html.Div([
             multi=True
         ),
 
+	#Radio: Relative change or raw values
     html.P('Select value display mode:'),
 
     dcc.RadioItems(
@@ -1106,6 +1286,7 @@ app.layout = html.Div([
         inline=True
     ),
 
+	#Radio: Emissions vs warming impact
     html.P('Select property display mode (emissions or warming impact):'),
 
     dcc.RadioItems(
@@ -1119,6 +1300,7 @@ app.layout = html.Div([
         inline=True
     ),
 
+	#Title
     dcc.Markdown(id = 'line-temp-title', mathjax=True,
                  style={
                      'fontSize': '24px',
@@ -1126,13 +1308,19 @@ app.layout = html.Div([
                      'fontweight': 'bold',
                  }),
 
+	#Message text
     dcc.Markdown(id = 'line-temp-text', mathjax=True,
                  style={
                      'fontSize': '20px',
                      'fontFamily': 'Open Sans',
                  }),
 
+	#Line grath to temperaure and emission
     dcc.Graph(id = 'line-temp'),
+
+	#--------------------------------------------
+	#Section 2: Bar plot (Top Emitters over time)
+	#--------------------------------------------
 
     html.H2('2. Historical Evolution of Largest Emitters'),
     html.P('Select a country or region:'),
@@ -1161,6 +1349,10 @@ app.layout = html.Div([
 
     dcc.Graph(id = 'bar-emissions'),
 
+	#--------------------------------------------
+	#Section 3: Choropleth map (Warming Impact)
+	#--------------------------------------------
+	
     html.H2('3. Global surface temperature rise'),
     dcc.Markdown(id = 'map-title', mathjax=True,
                  style={
@@ -1186,6 +1378,10 @@ app.layout = html.Div([
             step=1
         ),
 
+	#----------------------------------------------
+	#Section 4: Boxplot (Income group distribution)
+	#----------------------------------------------
+	
     html.H2('4. Distribution of Emissions by Income Level'),
     dcc.Markdown(id = 'box-title', mathjax=True,
                  style={
@@ -1202,6 +1398,10 @@ app.layout = html.Div([
 
     dcc.Graph(id = 'box-warming'),
 
+	#--------------------------------------------
+	#Section 5: Scatter plot (GDP vs Emissions)
+	#--------------------------------------------
+	
     html.H2('5. Relationship between Emissions and GDP'),
     dcc.RadioItems(
         id='scatter-mode',
@@ -1233,6 +1433,10 @@ app.layout = html.Div([
         ),
     dcc.Graph(id = 'scatter-gdp-emissions'),
 
+	#--------------------------------------------
+	#Section 6: Heatmap (Correlation Matrix)
+	#--------------------------------------------
+	
     html.H2('6. Correlations between factors'),
     dcc.Markdown(id = 'corr-title', mathjax=True,
                  style={
@@ -1274,7 +1478,11 @@ app.layout = html.Div([
 
 ])
 
-#Barra - filtro país novo
+#--------------------------------------------
+#Callbacks
+#--------------------------------------------
+
+#Update bar dropdown: auto-select top emitters in latest year
 @app.callback(
     dash.Output('country-bar-dropdown', 'value'),
     [dash.Input('gas-dropdown', 'value'),]
@@ -1291,7 +1499,7 @@ def update_bar_dropdown(selected_gas):
   top_countries = dff.sort_values(by=selected_gas, ascending=False).head(5)['country'].tolist()
   return top_countries
 
-#Scatter - slider ano
+#Update scatter slider: set auto year range based on selected gas
 @app.callback(
     [dash.Output('year-scatter-slider', 'min'),
      dash.Output('year-scatter-slider', 'max'),
@@ -1316,7 +1524,7 @@ def update_scatter_slider(selected_gas):
 
   return min_year, max_year, value, marks
 
-#Linha - Temperatura
+#Update line chart: emissions or warming impact
 @app.callback(
     [dash.Output('line-temp', 'figure'),
      dash.Output('line-temp-title', 'children'),
@@ -1406,7 +1614,7 @@ def update_line_temp(selected_source, selected_gas, selected_country, selected_v
 
   return fig, title, text
 
-#Barra - Emissões
+#Update bar chart: historicall emitters
 @app.callback(
   [dash.Output('bar-emissions', 'figure'),
    dash.Output('bar-title', 'children'),
@@ -1463,7 +1671,7 @@ def update_bar_emissions(selected_gas, selected_country):
 
   return fig, title, text
 
-#Mapa - warming
+#Update map plot: warming impact distribution
 @app.callback(
   [dash.Output('map-warming', 'figure'),
    dash.Output('map-title', 'children'),
@@ -1498,7 +1706,7 @@ def update_map_warming(selected_source, selected_country, selected_year):
   )
   return fig, title, text
 
-#Boxplot - warming-income
+#Update boxplot: emissions by income
 @app.callback(
   [dash.Output('box-warming', 'figure'),
    dash.Output('box-title', 'children'),
@@ -1536,7 +1744,7 @@ def update_box_warming(selected_source):
 
   return fig, title, text
 
-#Disperção - Emissões - GDP
+#Update scatter chart: emissions vs GDP
 @app.callback(
   [dash.Output('scatter-gdp-emissions', 'figure'),
    dash.Output('scatter-title', 'children'),
@@ -1601,7 +1809,7 @@ def update_scatter_emissions(selected_gas, mode, selected_year):
 
   return fig, title, text
 
-#Heatmap - warming
+#Update heatmap: correlation matrix
 @app.callback(
   [dash.Output('heatmap-warming', 'figure'),
    dash.Output('corr-title', 'children'),
@@ -1643,5 +1851,5 @@ def update_heatmap_emissions(selected_column, selected_year):
 
   return fig, title, text
 
-if __name__ == '__main__':
-  app.run()
+if __name__ == "__main__":
+  app.run_server(debug=False)

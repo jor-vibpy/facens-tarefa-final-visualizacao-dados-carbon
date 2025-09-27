@@ -1,0 +1,7 @@
+dash
+pandas
+numpy
+gunicorn
+plotly
+requirements
+matplotlib

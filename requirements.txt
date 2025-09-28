@@ -4,3 +4,4 @@ numpy
 gunicorn
 plotly
 matplotlib
+yaml

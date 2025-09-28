@@ -106,19 +106,6 @@ print("\n")
 #Standardize country column name
 df_temp_data = df_temp_data.rename(columns={'CNTR_NAME': 'country'})
 
-
-#-----------------------------------
-#Align country names across datasets
-#-----------------------------------
-paises_1 = set(df_co2['country'].unique())
-paises_2 = set(df_temp_data['country'].unique())
-
-so_no_dfco2 = paises_1-paises_2
-so_no_dftemp = paises_2-paises_1
-
-print(so_no_dfco2)
-print(so_no_dftemp)
-
 #Dictionary to harmonize country names between datasets
 #From owid co2 repository
 new_countries_name_temperature = {

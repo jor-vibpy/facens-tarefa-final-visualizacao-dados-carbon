@@ -1,7 +1,6 @@
 import requests
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import dash
 from dash import dcc, html
 import plotly.express as px
@@ -28,9 +27,9 @@ url_download = 'https://zenodo.org/records/14054503/files/GMST_response_1851-202
 file_name_3 = 'GMST_response_1851-2023.csv'
 
 #Download files locally
-get_data_web(url_1, file_name_1)
-get_data_web(url_2, file_name_2)
-get_data_web(url_download, file_name_3)
+#get_data_web(url_1, file_name_1)
+#get_data_web(url_2, file_name_2)
+#get_data_web(url_download, file_name_3)
 
 #-----------------------------
 #Load OWID datasets
@@ -355,7 +354,7 @@ df_temp_data['country'] = df_temp_data['country'].replace(new_countries_name_tem
 #----------------------------------
 
 url_income_groups = 'https://ourworldindata.org/grapher/world-bank-income-groups.csv?v=1&csvType=full&useColumnShortNames=true'
-get_data_web(url_income_groups, 'world-bank-income-groups.csv')
+#get_data_web(url_income_groups, 'world-bank-income-groups.csv')
 
 df_income_groups = pd.read_csv('world-bank-income-groups.csv')
 
@@ -395,14 +394,14 @@ df_comb_temp = pd.concat([df_temp_data, df_group], axis=0, ignore_index=True)
 import yaml
 
 url_yaml = 'https://raw.githubusercontent.com/owid/etl/refs/heads/master/etl/steps/data/garden/regions/2023-01-01/regions.yml'
-get_data_web(url_yaml, 'regions.yml')
+#get_data_web(url_yaml, 'regions.yml')
 
 with open('regions.yml') as file:
   df_regions = pd.DataFrame.from_dict(yaml.safe_load(file))
 
 
 url_regions_code = 'https://raw.githubusercontent.com/owid/etl/refs/heads/master/etl/steps/data/garden/regions/2023-01-01/regions.codes.csv'
-get_data_web(url_regions_code, 'regions_code.csv')
+#get_data_web(url_regions_code, 'regions_code.csv')
 
 df_codes = pd.read_csv('regions_code.csv', keep_default_na=False, na_values=[''])
 
@@ -619,7 +618,7 @@ df_merge_co2_inc_reg['total_ghg_relative_change'] = (
 
 #URL for annual emissions dataset Jones et. al (1830-2023)
 url_all_emissions = 'https://zenodo.org/records/14054503/files/EMISSIONS_ANNUAL_1830-2023.csv'
-get_data_web(url_all_emissions, 'all_emissions.csv')
+#get_data_web(url_all_emissions, 'all_emissions.csv')
 
 #Load emissions dataset
 df_all_emissions = pd.read_csv('all_emissions.csv')
@@ -1058,7 +1057,7 @@ df_co2_land_use_gb['country'] = df_co2_land_use_gb['country'].replace(new_countr
 
 #Download fossil CO2 dataset
 url_fossil_gb = 'https://zenodo.org/records/13981696/files/GCB2024v17_MtCO2_flat.csv'
-get_data_web(url_fossil_gb, 'co2_fossil_emissions.csv')
+#get_data_web(url_fossil_gb, 'co2_fossil_emissions.csv')
 
 #Load fossil dataset
 df_co2_fossil = pd.read_csv('co2_fossil_emissions.csv')

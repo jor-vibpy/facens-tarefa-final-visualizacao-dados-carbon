@@ -423,11 +423,6 @@ df_codes = pd.read_csv('regions_code.csv', keep_default_na=False, na_values=['']
 df_regions['short_name'] = df_regions['short_name'].fillna(df_regions['name'])
 df_regions['region_type'] = df_regions['region_type'].fillna('country')
 
-if 'defined_by' not in df_regions.columns:
-  df_regions['defined_by'] = pd.Series(dtype=str)
-df_regions['defined_by'] = df_regions['defined_by'].fillna('owid')
-df_regions['is_historical'] = df_regions['is_historical'].fillna(False)
-
 #Regions to be included
 regions_filter = ['Africa', 'Asia', 'Europe', 'North America', 'Oceania', 'South America',
                   'Asia (excl. China and India)', 'Europe (excl. EU-27)', 'Europe (excl. EU-28)',

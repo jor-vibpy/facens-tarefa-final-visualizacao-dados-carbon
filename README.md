@@ -10,10 +10,14 @@ Global Carbon Budget (2024) – with major processing by Our World in Data. “A
 
 Andrew, R. M., & Peters, G. P. (2024). The Global Carbon Project's fossil CO2 emissions dataset (2023v43) [Data set]. Zenodo. https://doi.org/10.5281/zenodo.10562476
 
-Jones, M.W. (2024) “National contributions to climate change due to historical emissions of carbon dioxide, methane and nitrous oxide”, Scientific Data. Zenodo. doi:10.5281/zenodo.14054503.
+Jones, M. W., Peters, G. P., Gasser, T., Andrew, R. M., Schwingshackl, C., Gütschow, J., Houghton, R. A., Friedlingstein, P., Pongratz, J., & Le Quéré, C. (2024). National contributions to climate change due to historical emissions of carbon dioxide, methane and nitrous oxide [Data set]. In Scientific Data (2024.2, Vol. 10, Número 155). Zenodo. https://doi.org/10.5281/zenodo.14054503
 
 Hannah Ritchie, Pablo Rosado, and Max Roser (2023) - “CO₂ and Greenhouse Gas Emissions” Published online at OurWorldinData.org. Retrieved from: 'https://ourworldindata.org/co2-and-greenhouse-gas-emissions' [Online Resource]
 
 ## Código desenvolvido com auxílio de:
 
 https://github.com/owid/co2-data
+
+## Visualização disponível em:
+
+https://facens-tarefa-final-visualizacao-dados.onrender.com/

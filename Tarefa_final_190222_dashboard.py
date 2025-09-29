@@ -5,10 +5,19 @@ from dash import dcc, html
 import plotly.express as px
 import plotly.graph_objects as go
 
+#-----------------------------------------------
+#Load transformed dataset for dashboard creation
+#-----------------------------------------------
+
 df_merge_co2_inc_reg_new = pd.read_csv('transformed_co2_dataset.csv')
 
+#Income groups list for dashboard filters
 income_groups = ['High-income countries', 'Low-income countries', 
                 'Lower-middle-income countries', 'Upper-middle-income countries']
+
+#-----------------------------
+#Helper functions
+#-----------------------------
 
 def min_year(df, col_year, col_country, col_ind, country):
   '''

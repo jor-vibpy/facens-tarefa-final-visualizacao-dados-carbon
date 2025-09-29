@@ -1185,4 +1185,8 @@ df_merge_co2_inc_reg_new['n2o_total_jones_relative_change'] = (
     .apply(lambda g: relative_change(df_merge_co2_inc_reg_new,g, 'n2o_total_jones'))
 )
 
+#----------------------------------------------
+#Generate new dataset for dashboard application
+#----------------------------------------------
+
 df_merge_co2_inc_reg_new.to_csv('transformed_co2_dataset.csv')
